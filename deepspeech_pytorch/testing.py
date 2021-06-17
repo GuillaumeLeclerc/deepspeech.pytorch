@@ -1,3 +1,5 @@
+from numpy.random import shuffle
+from types import SimpleNamespace
 import hydra
 import torch
 
@@ -5,12 +7,15 @@ from deepspeech_pytorch.configs.inference_config import EvalConfig
 from deepspeech_pytorch.decoder import GreedyDecoder
 from deepspeech_pytorch.loader.data_loader import SpectrogramDataset, AudioDataLoader
 from deepspeech_pytorch.utils import load_model, load_decoder
+from deepspeech_pytorch.loader.data_module import TestDataset
 from deepspeech_pytorch.validation import run_evaluation
+from torch.utils.data import Dataset, Sampler, DistributedSampler, DataLoader, IterableDataset
 
 
 @torch.no_grad()
 def evaluate(cfg: EvalConfig):
     device = torch.device("cuda" if cfg.model.cuda else "cpu")
+    print(device)
 
     model = load_model(
         device=device,
@@ -25,19 +30,19 @@ def evaluate(cfg: EvalConfig):
         labels=model.labels,
         blank_index=model.labels.index('_')
     )
-    test_dataset = SpectrogramDataset(
-        audio_conf=model.spect_cfg,
-        input_path=hydra.utils.to_absolute_path(cfg.test_path),
+    test_dataset = TestDataset(
+        cfg.test_path,
         labels=model.labels,
-        normalize=True
-    )
-    test_loader = AudioDataLoader(
-        test_dataset,
         batch_size=cfg.batch_size,
-        num_workers=cfg.num_workers
-    )
+        shuffle_size=0,
+        audio_conf=model.spect_cfg,
+        normalize=True,
+        testing=True,
+        augmentation_conf=SimpleNamespace(**{'kenansville_strength': 500, 'noise_factor': 1})
+        )
+
     wer, cer = run_evaluation(
-        test_loader=test_loader,
+        test_loader=test_dataset,
         device=device,
         model=model,
         decoder=decoder,

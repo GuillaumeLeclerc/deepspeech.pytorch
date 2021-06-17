@@ -16,6 +16,22 @@ from deepspeech_pytorch.loader.spec_augment import spec_augment
 
 torchaudio.set_audio_backend("sox_io")
 
+def kenansville_attack(x, snr_db):
+    threshold = 10**(-snr_db / 10)
+    x_fft = np.fft.fft(x)
+    x_psd = np.abs(x_fft) ** 2
+    threshold *= np.sum(x_psd)
+    x_psd_ind = np.argsort(x_psd)
+    dc_ind = np.where(x_psd_ind == 0)[0][0]
+    reordered = x_psd[x_psd_ind]
+    id = np.searchsorted(np.cumsum(reordered), threshold)
+    id -= id % 2
+    if (dc_ind < id) ^ (len(x) % 2 == 0 and len(x) / 2 < id):
+        id -= 1
+    x_fft[x_psd_ind[:id]] = 0
+    x_ifft = np.fft.ifft(x_fft)
+    return np.real(x_ifft).astype(np.float32)
+
 
 def load_audio(path):
     sound, sample_rate = torchaudio.load(path)
@@ -91,6 +107,7 @@ class SpectrogramParser(AudioParser):
         self.window_stride = audio_conf.window_stride
         self.window_size = audio_conf.window_size
         self.sample_rate = audio_conf.sample_rate
+        self.attack_strength = [audio_conf.attack_strength_max, audio_conf.attack_strength_min]
         self.window = audio_conf.window.value
         self.normalize = normalize
         self.aug_conf = augmentation_conf
@@ -110,6 +127,10 @@ class SpectrogramParser(AudioParser):
             add_noise = np.random.binomial(1, self.aug_conf.noise_prob)
             if add_noise:
                 y = self.noise_injector.inject_noise(y)
+        if self.attack_strength[0]  <= 40:
+            attack_strength = np.random.randint(*self.attack_strength)
+            y = kenansville_attack(y, attack_strength)
+
         n_fft = int(self.sample_rate * self.window_size)
         win_length = n_fft
         hop_length = int(self.sample_rate * self.window_stride)

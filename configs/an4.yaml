@@ -4,6 +4,9 @@ data:
   val_path: data/an4_val_manifest.json
   batch_size: 8
   num_workers: 8
+  spect:
+    attack_strength_min: 30
+    attack_strength_max: 10
 trainer:
   max_epochs: 70
   gpus: 1
@@ -16,3 +19,4 @@ checkpoint:
   save_top_k: 1
   monitor: "wer"
   verbose: True
+  mode: "min"

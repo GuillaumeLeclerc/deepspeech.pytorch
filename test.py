@@ -10,6 +10,7 @@ cs.store(name="config", node=EvalConfig)
 
 @hydra.main(config_name="config")
 def hydra_main(cfg: EvalConfig):
+    print("HOHO")
     evaluate(cfg=cfg)
 
 

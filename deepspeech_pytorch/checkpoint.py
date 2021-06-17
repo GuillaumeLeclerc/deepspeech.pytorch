@@ -22,8 +22,7 @@ class CheckpointHandler(ModelCheckpoint):
             save_top_k=cfg.save_top_k,
             save_weights_only=cfg.save_weights_only,
             mode=cfg.mode,
-            period=cfg.period,
-            prefix=cfg.prefix
+            period=cfg.period
         )
 
     def find_latest_checkpoint(self):

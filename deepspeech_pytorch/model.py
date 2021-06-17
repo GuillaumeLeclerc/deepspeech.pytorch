@@ -236,10 +236,13 @@ class DeepSpeech(pl.LightningModule):
         inputs, targets, input_percentages, target_sizes = batch
         input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
         out, output_sizes = self(inputs, input_sizes)
+
         out = out.transpose(0, 1)  # TxNxH
         out = out.log_softmax(-1)
 
+        print(inputs.shape, targets.shape)
         loss = self.criterion(out, targets, output_sizes, target_sizes)
+
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -248,6 +251,7 @@ class DeepSpeech(pl.LightningModule):
         inputs = inputs.to(self.device)
         with autocast(enabled=self.precision == 16):
             out, output_sizes = self(inputs, input_sizes)
+
         decoded_output, _ = self.evaluation_decoder.decode(out, output_sizes)
         self.wer(
             preds=out,
@@ -302,3 +306,4 @@ class DeepSpeech(pl.LightningModule):
             if type(m) == nn.modules.conv.Conv2d:
                 seq_len = ((seq_len + 2 * m.padding[1] - m.dilation[1] * (m.kernel_size[1] - 1) - 1) // m.stride[1] + 1)
         return seq_len.int()
+                      

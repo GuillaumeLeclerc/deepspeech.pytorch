@@ -148,13 +148,18 @@ def run_evaluation(test_loader,
         decoder=decoder,
         target_decoder=target_decoder
     )
-    for i, (batch) in tqdm(enumerate(test_loader), total=len(test_loader)):
+    for i, (batch) in tqdm(enumerate(test_loader)):
         inputs, targets, input_percentages, target_sizes = batch
         input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
         inputs = inputs.to(device)
         with autocast(enabled=precision == 16):
             out, output_sizes = model(inputs, input_sizes)
-        decoded_output, _ = decoder.decode(out, output_sizes)
+        reps = out.shape[0]
+        out = out.mean(0).unsqueeze(0)
+        output_sizes = output_sizes[:1]
+        targets = targets[:targets.shape[0] // reps]
+        target_sizes = target_sizes[:1]
+        decoded_output, _ = decoder.decode(out, output_sizes[:1])
         wer.update(
             preds=out,
             preds_sizes=output_sizes,
@@ -167,4 +172,6 @@ def run_evaluation(test_loader,
             targets=targets,
             target_sizes=target_sizes
         )
+        if i > 20:
+            break
     return wer.compute(), cer.compute()

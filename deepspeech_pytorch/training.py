@@ -1,11 +1,14 @@
 import json
 
+from omegaconf import OmegaConf
 import hydra
 from deepspeech_pytorch.checkpoint import GCSCheckpointHandler, FileCheckpointHandler
 from deepspeech_pytorch.configs.train_config import DeepSpeechConfig, GCSCheckpointConfig
 from deepspeech_pytorch.loader.data_module import DeepSpeechDataModule
 from deepspeech_pytorch.model import DeepSpeech
 from hydra.utils import to_absolute_path
+from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning import Trainer
 from omegaconf import OmegaConf
 from pytorch_lightning import seed_everything
 
@@ -44,10 +47,20 @@ def train(cfg: DeepSpeechConfig):
         precision=cfg.trainer.precision,
         spect_cfg=cfg.data.spect
     )
+    logger = WandbLogger(project='audio-prod')
 
-    trainer = hydra.utils.instantiate(
-        config=cfg.trainer,
+    params = OmegaConf.to_container(cfg.trainer)
+    del params['_target_']
+    del params['callbacks']
+    del params['replace_sampler_ddp']
+    del params['logger']
+
+
+    trainer = Trainer(
         replace_sampler_ddp=False,
         callbacks=[checkpoint_callback] if cfg.trainer.checkpoint_callback else None,
+        logger=logger,
+        **params
     )
+
     trainer.fit(model, data_loader)
